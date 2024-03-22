@@ -1,24 +1,25 @@
-import { plainToClass } from 'class-transformer';
+import { plainToClass, plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import { RequestHandler } from 'express';
+import { NextFunction, Request,  RequestHandler,  Response } from 'express';
 import { HttpException } from '@exceptions/HttpException';
+import { createUser } from '@/validations/user.validation';
+import userModel from '@/models/users.model';
+import Joi from 'joi';
 
-const validationMiddleware = (
-  type: any,
-  value: string | 'body' | 'query' | 'params' = 'body',
-  skipMissingProperties = false,
-  whitelist = true,
-  forbidNonWhitelisted = true,
-): RequestHandler => {
+
+const validationMiddleware = (schema) => {
   return (req, res, next) => {
-    validate(plainToClass(type, req[value]), { skipMissingProperties, whitelist, forbidNonWhitelisted }).then((errors: ValidationError[]) => {
-      if (errors.length > 0) {
-        const message = errors.map((error: ValidationError) => Object.values(error.constraints)).join(', ');
-        next(new HttpException(400, message));
-      } else {
-        next();
-      }
-    });
+    const result = schema.validate(req.body);
+    if (result.error) {
+      return res.status(400).json({
+        error: result.error.details[0].message,
+      });
+    }
+    if (!req.value) {
+      req.value = {};
+    }
+    req.value['body'] = result.value;
+    next();
   };
 };
 
